@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import path from 'path';
+import fs from 'fs';
 import asaasRouter from './routes/asaas.js';
 import { fileURLToPath } from 'url';
 
@@ -15,9 +16,14 @@ const __dirname = path.dirname(__filename);
 const app = express();
 const PORT = process.env.PORT || 5000;
 
+// Detectar ambiente
+const isProduction = process.env.NODE_ENV === 'production';
+
 // Middleware
 app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'],
+  origin: isProduction 
+    ? [process.env.FRONTEND_URL || '*'] 
+    : ['http://localhost:5173', 'http://127.0.0.1:5173', 'http://localhost:5174', 'http://127.0.0.1:5174'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -41,12 +47,30 @@ app.get('/api/test', (req, res) => {
 app.use('/api/asaas', asaasRouter);
 
 // Serve static assets in production
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'dist')));
+if (isProduction) {
+  // Caminho para os arquivos estáticos do frontend
+  const distPath = path.join(__dirname, 'dist');
   
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(__dirname, 'dist', 'index.html'));
-  });
+  // Verificar se o diretório existe
+  try {
+    if (fs.existsSync(distPath)) {
+      console.log('Serving static files from:', distPath);
+      app.use(express.static(distPath));
+      
+      // Todas as rotas não-API redirecionam para o frontend
+      app.get('*', (req, res, next) => {
+        // Pular para o próximo middleware se for uma rota de API
+        if (req.path.startsWith('/api/')) {
+          return next();
+        }
+        res.sendFile(path.join(distPath, 'index.html'));
+      });
+    } else {
+      console.warn('Warning: dist directory not found at', distPath);
+    }
+  } catch (err) {
+    console.error('Error checking dist directory:', err);
+  }
 }
 
 app.listen(PORT, () => {
