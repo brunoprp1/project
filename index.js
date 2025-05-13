@@ -17,11 +17,18 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
-// Prefixo para todas as rotas
-const API_PREFIX = '/klaviyo-proxy';
+// Prefixos para as rotas
+const API_PREFIX = '/api-proxy';
+const KLAVIYO_PREFIX = `${API_PREFIX}/klaviyo`;
+const ASAAS_PREFIX = `${API_PREFIX}/asaas`;
+
+// URLs base das APIs
+const KLAVIYO_API_URL_V2 = 'https://a.klaviyo.com/api/v2';
+const KLAVIYO_API_URL_V3 = 'https://a.klaviyo.com/api/metrics';
+const ASAAS_API_URL = 'https://sandbox.asaas.com/api/v3';
 
 // Endpoint para buscar dados de receita da Klaviyo
-app.get(`${API_PREFIX}/klaviyo-revenue`, async (req, res) => {
+app.get(`${KLAVIYO_PREFIX}/revenue`, async (req, res) => {
   try {
     const { start_date, end_date, api_key, public_key } = req.query;
     
@@ -105,6 +112,205 @@ app.get(`${API_PREFIX}/klaviyo-revenue`, async (req, res) => {
       });
     } else {
       // Algo aconteceu na configuração da requisição que causou um erro
+      return res.status(500).json({
+        error: 'Erro ao configurar a requisição',
+        details: error.message
+      });
+    }
+  }
+});
+
+// Endpoints para a API do Asaas
+
+// Endpoint para buscar pagamentos do Asaas
+app.get(`${ASAAS_PREFIX}/payments`, async (req, res) => {
+  try {
+    const { startDueDate, endDueDate } = req.query;
+    const apiKey = req.headers['access-token'] || req.query.access_token;
+    
+    // Validação dos parâmetros
+    if (!apiKey) {
+      return res.status(400).json({ error: 'O header access-token ou o parâmetro access_token é obrigatório' });
+    }
+
+    // Construir a URL com os parâmetros de consulta
+    let url = `${ASAAS_API_URL}/payments`;
+    const params = new URLSearchParams();
+    
+    if (startDueDate) params.append('startDueDate', startDueDate);
+    if (endDueDate) params.append('endDueDate', endDueDate);
+    
+    // Adicionar outros parâmetros de consulta que foram passados
+    for (const [key, value] of Object.entries(req.query)) {
+      if (key !== 'access_token' && key !== 'startDueDate' && key !== 'endDueDate') {
+        params.append(key, value);
+      }
+    }
+    
+    // Adicionar os parâmetros à URL se houver algum
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+
+    // Fazendo a requisição para a API do Asaas
+    const response = await axios.get(url, {
+      headers: {
+        'access_token': apiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // Retornando os dados para o cliente
+    return res.json(response.data);
+  } catch (error) {
+    console.error('Erro ao buscar dados do Asaas:', error.message);
+    
+    // Retornando o erro para o cliente de forma mais detalhada
+    if (error.response) {
+      // A requisição foi feita e o servidor respondeu com um status fora do range 2xx
+      return res.status(error.response.status).json({
+        error: 'Erro na API do Asaas',
+        details: error.response.data
+      });
+    } else if (error.request) {
+      // A requisição foi feita mas não houve resposta
+      return res.status(503).json({
+        error: 'Sem resposta da API do Asaas',
+        details: 'A requisição foi feita, mas não houve resposta do servidor'
+      });
+    } else {
+      // Algo aconteceu na configuração da requisição que causou um erro
+      return res.status(500).json({
+        error: 'Erro ao configurar a requisição',
+        details: error.message
+      });
+    }
+  }
+});
+
+// Endpoint para buscar clientes do Asaas
+app.get(`${ASAAS_PREFIX}/customers`, async (req, res) => {
+  try {
+    const apiKey = req.headers['access-token'] || req.query.access_token;
+    
+    // Validação dos parâmetros
+    if (!apiKey) {
+      return res.status(400).json({ error: 'O header access-token ou o parâmetro access_token é obrigatório' });
+    }
+
+    // Construir a URL com os parâmetros de consulta
+    let url = `${ASAAS_API_URL}/customers`;
+    const params = new URLSearchParams();
+    
+    // Adicionar parâmetros de consulta que foram passados
+    for (const [key, value] of Object.entries(req.query)) {
+      if (key !== 'access_token') {
+        params.append(key, value);
+      }
+    }
+    
+    // Adicionar os parâmetros à URL se houver algum
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+
+    // Fazendo a requisição para a API do Asaas
+    const response = await axios.get(url, {
+      headers: {
+        'access_token': apiKey,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    // Retornando os dados para o cliente
+    return res.json(response.data);
+  } catch (error) {
+    console.error('Erro ao buscar clientes do Asaas:', error.message);
+    
+    // Retornando o erro para o cliente de forma mais detalhada
+    if (error.response) {
+      return res.status(error.response.status).json({
+        error: 'Erro na API do Asaas',
+        details: error.response.data
+      });
+    } else if (error.request) {
+      return res.status(503).json({
+        error: 'Sem resposta da API do Asaas',
+        details: 'A requisição foi feita, mas não houve resposta do servidor'
+      });
+    } else {
+      return res.status(500).json({
+        error: 'Erro ao configurar a requisição',
+        details: error.message
+      });
+    }
+  }
+});
+
+// Endpoint genérico para qualquer rota da API do Asaas
+app.all(`${ASAAS_PREFIX}/*`, async (req, res) => {
+  try {
+    const apiKey = req.headers['access-token'] || req.query.access_token;
+    
+    // Validação dos parâmetros
+    if (!apiKey) {
+      return res.status(400).json({ error: 'O header access-token ou o parâmetro access_token é obrigatório' });
+    }
+
+    // Extrair o caminho da API do Asaas da URL
+    const path = req.path.replace(`${ASAAS_PREFIX}`, '');
+    
+    // Construir a URL com os parâmetros de consulta
+    let url = `${ASAAS_API_URL}${path}`;
+    const params = new URLSearchParams();
+    
+    // Adicionar parâmetros de consulta que foram passados
+    for (const [key, value] of Object.entries(req.query)) {
+      if (key !== 'access_token') {
+        params.append(key, value);
+      }
+    }
+    
+    // Adicionar os parâmetros à URL se houver algum
+    if (params.toString()) {
+      url += `?${params.toString()}`;
+    }
+
+    // Configurar a requisição para a API do Asaas
+    const config = {
+      method: req.method,
+      url,
+      headers: {
+        'access_token': apiKey,
+        'Content-Type': 'application/json'
+      }
+    };
+    
+    // Adicionar corpo da requisição se for POST, PUT ou PATCH
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+      config.data = req.body;
+    }
+
+    // Fazendo a requisição para a API do Asaas
+    const response = await axios(config);
+    
+    // Retornando os dados para o cliente
+    return res.status(response.status).json(response.data);
+  } catch (error) {
+    console.error(`Erro ao acessar ${req.method} ${req.path}:`, error.message);
+    
+    // Retornando o erro para o cliente de forma mais detalhada
+    if (error.response) {
+      return res.status(error.response.status).json({
+        error: 'Erro na API do Asaas',
+        details: error.response.data
+      });
+    } else if (error.request) {
+      return res.status(503).json({
+        error: 'Sem resposta da API do Asaas',
+        details: 'A requisição foi feita, mas não houve resposta do servidor'
+      });
+    } else {
       return res.status(500).json({
         error: 'Erro ao configurar a requisição',
         details: error.message
