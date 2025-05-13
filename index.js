@@ -17,8 +17,11 @@ const corsOptions = {
 
 app.use(cors(corsOptions));
 
+// Prefixo para todas as rotas
+const API_PREFIX = '/klaviyo-proxy';
+
 // Endpoint para buscar dados de receita da Klaviyo
-app.get('/klaviyo-revenue', async (req, res) => {
+app.get(`${API_PREFIX}/klaviyo-revenue`, async (req, res) => {
   try {
     const { start_date, end_date, api_key, public_key } = req.query;
     
@@ -111,7 +114,7 @@ app.get('/klaviyo-revenue', async (req, res) => {
 });
 
 // Rota de verificação de saúde do servidor
-app.get('/health', (req, res) => {
+app.get(`${API_PREFIX}/health`, (req, res) => {
   res.status(200).json({ status: 'ok', message: 'Servidor funcionando corretamente' });
 });
 
