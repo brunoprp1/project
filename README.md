@@ -20,7 +20,7 @@ Backend intermediário (proxy) para contornar problemas de CORS ao acessar a API
 
 ## Endpoints
 
-### GET /klaviyo-revenue
+### GET /klaviyo-proxy/klaviyo-revenue
 
 Busca dados de receita da Klaviyo.
 
@@ -32,10 +32,10 @@ Busca dados de receita da Klaviyo.
 
 **Exemplo de uso:**
 ```
-GET /klaviyo-revenue?start_date=2023-01-01&end_date=2023-01-31&api_key=sk_xxxxxxxx
+GET /klaviyo-proxy/klaviyo-revenue?start_date=2023-01-01&end_date=2023-01-31&api_key=sk_xxxxxxxx
 ```
 
-### GET /health
+### GET /klaviyo-proxy/health
 
 Verifica se o servidor está funcionando corretamente.
 
